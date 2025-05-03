@@ -91,7 +91,7 @@ def main():
             user_input = Prompt.ask("[bold blue]You[/bold blue]")
         except (KeyboardInterrupt, EOFError):
             print(f"/thanks")
-            print(f"\n[bold yellow]{model}:[/bold yellow] Of course! If you need me again, just type \"chat\" into your terminal.")
+            print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
             break
 
         if not user_input.strip():
@@ -106,7 +106,7 @@ def main():
             cmd = cmd_parts[0][1:].lower()
 
             if cmd in ("thanks"):
-                print(f"\n[bold yellow]{model}:[/bold yellow] Goodbye! If you need me again, just type \"chat\" into your terminal.")
+                print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
                 break
 
             if cmd == "model":
