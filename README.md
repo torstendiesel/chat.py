@@ -1,6 +1,29 @@
 # chat.py
 Opinionated ChatGPT clone in the terminal with a nice UI
 
+```
+$ python3 chat.py
+
+/thanks to leave
+/model to switch models
+/import file1.txt [file2.txt\]...
+/usage to view API usage
+
+gpt-4.1-nano: How can I help you today?
+
+You: Write a haiku about key lime pie.    
+
+gpt-4.1-nano:
+Sweet tang in each bite,                                                        
+Crimson crust and tender lime,                                                  
+Summer’s creamy glow.                                                           
+
+You: /thanks
+
+gpt-4.1-nano: You're welcome! If you need me again, just type "chat" into your 
+terminal.
+```
+
 ## Features
 - Choose various models (uses gpt-4.1-nano by default because it's cheap, but it's easy to switch mid-conversation)
 - Looks almost as good as the normal chatGPT application
