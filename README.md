@@ -39,6 +39,7 @@ terminal.
 - Can't use up/down arrows to try different inputs
 - No feature parity with normal chatGPT application yet: I haven't figured out image uploads, voice chat, memory, or customizing system prompts without editing the source code yet.
 - No token streaming
+- Written with o4-mini anyways -- you could honestly probably make this yourself if you wanted to
 
 ## Purpose
 This is more or less a test project, because I figured it would be easy enough to accomplish. I like ollama, but any useful model is too weak to run on my humble laptop. I also spent WAY too much time into making this work today, so I'm uploading it to github then I'm deleting it off my machine so that I can get some proper work done today :)
