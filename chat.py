@@ -63,7 +63,7 @@ def setup_log_file(model):
     LOG_DIR = "logs"
     os.makedirs(LOG_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_path  = os.path.join(LOG_DIR, f"chat_{ts}.txt")
+    log_path  = os.path.join(LOG_DIR, f"chat_{timestamp}.txt")
     log_file = open(log_path, "a", encoding="utf-8")
     log_file.write(f"Chat session started {datetime.now().isoformat()}\n")
     log_file.write(f"Model: {model}\n\n")
