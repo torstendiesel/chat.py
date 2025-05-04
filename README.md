@@ -37,6 +37,7 @@ terminal.
 
 ## Anti-features
 - I don't have the capacity to update this that often -- it works really well as of May 2025 but I can't promise updates
+- Inputs aren't sanitized, and cannot be more than one line without probably breaking something
 - Can't use up/down arrows to try different inputs on Linux
 - No feature parity with normal chatGPT application yet: I haven't figured out image uploads, voice chat, memory, or customizing system prompts without editing the source code yet.
 - Written with o4-mini anyways -- you could honestly probably make this yourself if you wanted to
