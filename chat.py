@@ -6,6 +6,11 @@ import argparse
 import webbrowser
 import shlex
 
+from rich import print
+from rich.console import Console
+from rich.prompt import Prompt
+from rich.markdown import Markdown
+
 # python-dotenv support (optional)
 try:
     from dotenv import load_dotenv
@@ -26,10 +31,6 @@ def get_api_key():
 from openai import OpenAI
 
 client = OpenAI(api_key=get_api_key())
-from rich import print
-from rich.console import Console
-from rich.prompt import Prompt
-from rich.markdown import Markdown
 
 # for billing endpoints
 from datetime import date
@@ -83,7 +84,7 @@ def main():
     messages = [{"role": "system", "content": "You are a helpful assistant."}]
 
     # print(f"\n[grey50]Model:[/grey50] [cyan]{model}[/cyan]")
-    print("\n[grey50]/thanks to leave\n/model to switch models\n/import file1.txt \[file2.txt\]...\n/usage to view API usage[/grey50]\n")
+    print("\n[grey50]/thanks to leave\n/model to switch models\n/import file1.txt (file2.txt)...\n/usage to view API usage[/grey50]\n")
 
     print(f"[bold yellow]{model}[/bold yellow]: How can I help you today?\n")
     while True:
