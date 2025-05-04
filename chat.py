@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import os
 from datetime import datetime
-#from time import sleep
-def sleep(time):
-    return 0
+from time import sleep
+#def sleep(time):
+    #return 0
 import sys
 import argparse
 import webbrowser
@@ -77,13 +77,7 @@ def estimate_display_lines(text: str, width: int) -> int:
         total_lines += (len(line) // width) + 1
     return total_lines
 
-def main():
-    console = Console()
-    args = parse_args()
-    model = args.model
-    term_width = get_terminal_width() 
-
-    # ─── SETUP LOG FILE ───────────────────────────
+def setup_log_file(model):
     # create logs dir if missing
     LOG_DIR = "logs"
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -91,24 +85,130 @@ def main():
     ts        = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_path  = os.path.join(LOG_DIR, f"chat_{ts}.txt")
     # open handle in append mode
-    log_file  = open(log_path, "a", encoding="utf-8")
+    log_file = open(log_path, "a", encoding="utf-8")
     # write a header
     log_file.write(f"Chat session started {datetime.now().isoformat()}\n")
     log_file.write(f"Model: {model}\n\n")
-    # ────────────────────────────────────────────────
+    return log_file
 
-    messages = [{"role": "system", "content": "You are a helpful assistant."}]
+model_comparison = """Model comparison:
+gpt-4.1: Flagship GPT model for complex tasks. 
+gpt-4.1-mini: Balanced for intelligence, speed, and cost
+gpt-4.1-nano (default): Fastest, most cost-effective GPT-4.1 model
+o4-mini: Faster, more affordable reasoning model
 
-    # print(f"\n[grey50]Model:[/grey50] [cyan]{model}[/cyan]")
-    print("\n[grey50]/thanks to leave\n/model to switch models\n/import file1.txt (file2.txt)...\n/usage to view API usage[/grey50]\n")
+| Model        | Intelligence    | Speed | Price (Input/Output per 1M tokens) |
+|--------------|-----------------|-------|------------------------------------|
+| gpt-4.1      | 4/5             | 3/5   | $2.00 / $8.00                      |
+| gpt-4.1-mini | 3/5             | 4/5   | $0.40 / $1.60                      |
+| gpt-4.1-nano | 2/5             | 5/5   | $0.10 / $0.40                      |
+| o4-mini      | 4/5 (Reasoning) | 3/5   | $1.10 / $4.40                      |
+\n"""
 
-    print(f"[bold yellow]{model}[/bold yellow]: How can I help you today?\n")
+def thanks(model):
+    print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
+
+def model_dialogue(cmd_parts, cmd, model):
+    if len(cmd_parts) == 1:
+        print(f"\nCurrent model: [cyan]{model}[/cyan]")
+        print("Available:", ", ".join(ALLOWED_MODELS))
+        print(model_comparison)
+        return 0
+    else:
+        new_model = cmd_parts[1].strip()
+        if new_model in ALLOWED_MODELS:
+            model = new_model
+            print(f"\n[bold green]Switched model to:[/bold green] {model}")
+            return model
+        else:
+            print(f"\n[bold red]Error:[/bold red] '{new_model}' is not a valid model.")
+            print("\nChoose from:", ", ".join(ALLOWED_MODELS))
+            return 0
+
+def import_files_as_context(user_input, log_file, messages):
+    # Usage: /import <file1> [<file2> …]
+    try:
+        parts = shlex.split(user_input)
+    except ValueError as e:
+        print(f"\n[bold red]Error parsing command:[/bold red] {e}")
+        #continue
+
+    if len(parts) < 2:
+        print("\nUsage: /import <file_path> [...]")
+        #continue
+
+    for raw_path in parts[1:]:
+        file_path = os.path.expanduser(raw_path)
+        if not os.path.isfile(file_path):
+            print(f"\n[bold red]Error:[/bold red] File not found: {file_path}")
+            #continue
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            header = f"<Imported file {file_path}>"
+            messages.append({
+                "role": "user",
+                "content": f"{header}\n\n{content}"
+            })
+            print(f"\n[bold green]Imported:[/bold green] {file_path}")
+            log_file.write(f"You imported {file_path}:\n{content}\n\n")
+        except Exception as e:
+            print(f"\n[bold red]Error reading {file_path}:[/bold red] {e}")
+
+
+
+def response(messages, log_file, term_width, model, console):
+    # Most complex part of this program
+    # Streams tokens as plaintext, then once we get the final response, clear all the lines of plaintext and replace them with markdown
+    try:
+        console.print(f"\n[bold green]{model} is thinking...[/bold green]")
+        stream = client.responses.create(model=model, input=messages, stream=True)
+        length_of_current_line = 0
+        number_of_lines_in_output_so_far = 0
+        output = ""
+        for event in stream:
+            if event.type == "response.output_text.delta":
+                delta = event.delta
+                sys.stdout.write(delta)
+                sys.stdout.flush()
+                length_of_current_line += len(delta)
+                if delta.count('\n') > 0:
+                    number_of_lines_in_output_so_far += delta.count('\n')
+                    length_of_current_line = 0
+                if length_of_current_line >= term_width:
+                    number_of_lines_in_output_so_far += 1
+                    length_of_current_line = 0
+            if event.type == "response.output_text.done":
+                answer = event.text
+        for _ in range(number_of_lines_in_output_so_far + 2):
+            sys.stdout.write('\033[2K')  # Clear the line
+            sys.stdout.write('\033[F')  # Move cursor up
+            sys.stdout.flush()
+        console.print(f"\n[bold yellow]{model}:[/bold yellow]")
+        console.print(Markdown(answer))
+        print("")
+        messages.append({"role": "assistant", "content": answer})
+        log_file.write(f"{model}: {answer}\n\n")
+
+    except OpenAIError as e:
+        print(f"\n[bold red]OpenAI API Error:[/bold red] {e}")
+        log_file.write(f"[ERROR] OpenAI API Error: {e}\n\n")
+    except (KeyboardInterrupt, EOFError):
+        print("")
+        return 0
+    except Exception as e:
+        print(f"\n[bold red]Unexpected Error:[/bold red] {e}")
+        log_file.write(f"[ERROR] Unexpected: {e}\n\n")
+
+
+def loop(model, console, term_width, log_file, messages):
+
     while True:
         try:
             user_input = Prompt.ask("[bold blue]You[/bold blue]")
         except (KeyboardInterrupt, EOFError):
             print(f"/thanks")
-            print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
+            thanks(model)
             break
 
         if not user_input.strip():
@@ -123,34 +223,13 @@ def main():
             cmd = cmd_parts[0][1:].lower()
 
             if cmd in ("thanks"):
-                print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
+                thanks(model)
                 break
 
             if cmd == "model":
-                if len(cmd_parts) == 1:
-                    print(f"\nCurrent model: [cyan]{model}[/cyan]")
-                    print("Available:", ", ".join(ALLOWED_MODELS))
-                    print("""Model comparison:
-gpt-4.1: Flagship GPT model for complex tasks. 
-gpt-4.1-mini: Balanced for intelligence, speed, and cost
-gpt-4.1-nano (default): Fastest, most cost-effective GPT-4.1 model
-o4-mini: Faster, more affordable reasoning model
-
-| Model        | Intelligence    | Speed | Price (Input/Output per 1M tokens) |
-|--------------|-----------------|-------|------------------------------------|
-| gpt-4.1      | 4/5             | 3/5   | $2.00 / $8.00                      |
-| gpt-4.1-mini | 3/5             | 4/5   | $0.40 / $1.60                      |
-| gpt-4.1-nano | 2/5             | 5/5   | $0.10 / $0.40                      |
-| o4-mini      | 4/5 (Reasoning) | 3/5   | $1.10 / $4.40                      |
-\n""")
-                else:
-                    new_model = cmd_parts[1].strip()
-                    if new_model in ALLOWED_MODELS:
-                        model = new_model
-                        print(f"\n[bold green]Switched model to:[/bold green] {model}")
-                    else:
-                        print(f"\n[bold red]Error:[/bold red] '{new_model}' is not a valid model.")
-                        print("\nChoose from:", ", ".join(ALLOWED_MODELS))
+                model_selector = model_dialogue(cmd_parts, cmd, model)
+                if model_selector: # returns 0 if no model chosen
+                    model = model_selector
                 continue
             
             if cmd == "usage":
@@ -158,34 +237,7 @@ o4-mini: Faster, more affordable reasoning model
                 continue
 
             if cmd == "import":
-                # Usage: /import <file1> [<file2> …]
-                try:
-                    parts = shlex.split(user_input)
-                except ValueError as e:
-                    print(f"\n[bold red]Error parsing command:[/bold red] {e}")
-                    continue
-
-                if len(parts) < 2:
-                    print("\n[bold red]Error:[/bold red] Usage: /import <file_path> [...]")
-                    continue
-
-                for raw_path in parts[1:]:
-                    file_path = os.path.expanduser(raw_path)
-                    if not os.path.isfile(file_path):
-                        print(f"\n[bold red]Error:[/bold red] File not found: {file_path}")
-                        continue
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            content = f.read()
-                        header = f"<Imported file {file_path}>"
-                        messages.append({
-                            "role": "user",
-                            "content": f"{header}\n\n{content}"
-                        })
-                        print(f"\n[bold green]Imported:[/bold green] {file_path}")
-                        log_file.write(f"You imported {file_path}:\n{content}\n\n")
-                    except Exception as e:
-                        print(f"\n[bold red]Error reading {file_path}:[/bold red] {e}")
+                import_files_as_context(user_input, log_file, messages)
                 continue
 
             print(f"\n[bold red]Unknown command:[/bold red] /{cmd}")
@@ -196,66 +248,24 @@ o4-mini: Faster, more affordable reasoning model
         messages.append({"role": "user", "content": user_input})
 
         # Response 
-        try:
-            console.print(f"\n[bold yellow]{model} is thinking...[/bold yellow]")
-            stream = client.responses.create(model=model, input=messages, stream=True)
-            output_length = 0
-            output_buffer = ""
-            for event in stream: 
-                #print(event.type)
-                if event.type == "response.output_text.delta":
-                    #print(event)
-                    output_length += len(event.delta)
-                    output_buffer += event.delta
-                    sys.stdout.write(event.delta)
-                    sys.stdout.flush()
-                    sleep(0.05)
-#                    if event.type == "response.output_text.done":
-#                        sys.stdout.write('\b' * len(live_buffer) + ' ' * len(live_buffer))
-#                        sys.stdout.flush()
-#                        #console.clear()
-#                        answer = event.text
-                #print(stream)
-                #answer = stream.output_item.done
-            #lines = output_buffer.count('\n') + 2
-            lines_to_clear = estimate_display_lines(output_buffer, term_width) + 1
-            for _ in range(lines_to_clear):
-                sys.stdout.write('\033[F')  # Move cursor up
-                #sys.stdout.write(' ' * 100)  # Clear the line
-                sys.stdout.write('\033[K')  # Clear the line
-                sys.stdout.flush()
-                sleep(0.5)
-            answer = output_buffer
-            # sys.stdout.write('\b' * output_length + ' ' * output_length)
-            # sys.stdout.flush()
-            console.print(f"\n[bold yellow]{model}:[/bold yellow]")
-            console.print(Markdown(answer))
-            print("")
-            messages.append({"role": "assistant", "content": answer})
+        response(messages, log_file, term_width, model, console)
 
-#def chatstream(list):
-#     strlen = 0
-#     output_buffer = ""
-#     for entry in list:
-#         strlen += len(entry)
-#         output_buffer += entry
-#         sys.stdout.write(entry)
-#         sys.stdout.flush()
-#         sleep(0.1)
-#     sys.stdout.write('\b' * strlen + output_buffer.upper() + '\n')
-#     sys.stdout.flush()
+def main():
 
-            # log AI response
-            log_file.write(f"{model}: {answer}\n\n")
+    print("\n[grey50]/thanks to leave\n/model to switch models\n/import file1.txt (file2.txt)...\n/usage to view API usage[/grey50]\n")
 
-        except OpenAIError as e:
-            print(f"\n[bold red]OpenAI API Error:[/bold red] {e}")
-            log_file.write(f"[ERROR] OpenAI API Error: {e}\n\n")
-        except Exception as e:
-            print(f"\n[bold red]Unexpected Error:[/bold red] {e}")
-            log_file.write(f"[ERROR] Unexpected: {e}\n\n")
+    args = parse_args()
+    model = args.model
+    print(f"[bold yellow]{model}[/bold yellow]: How can I help you today?\n")
 
-    # ─── CLEAN UP ──────────────────────────────────
+    console = Console()
+    term_width = get_terminal_width() 
+    log_file = setup_log_file(model);
+    messages = [{"role": "system", "content": "You are a helpful assistant."}]
+
+    loop(model, console, term_width, log_file, messages)
+
+    # Clean up
     log_file.write(f"\nChat session ended {datetime.now().isoformat()}\n")
     log_file.close()
 
