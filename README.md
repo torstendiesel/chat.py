@@ -1,6 +1,7 @@
 # chat.py
 Opinionated ChatGPT clone in the terminal with a nice UI
 
+## Example usage
 ```
 $ python3 chat.py
 
@@ -23,6 +24,15 @@ You: /thanks
 gpt-4.1-nano: You're welcome! If you need me again, just type "chat" into your 
 terminal.
 ```
+
+## Installation
+Git pull this repository, then to get dependencies run the following shell command:
+
+```bash
+pip install openai sys argparse shlex shutil rich
+```
+
+That aught to do the trick, make a new issue if you can't figure it out. 
 
 ## Features
 - Choose various models (uses gpt-4.1-nano by default because it's cheap, but it's easy to switch mid-conversation)
