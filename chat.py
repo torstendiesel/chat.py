@@ -2,13 +2,12 @@
 import os
 from datetime import datetime
 from time import sleep
-#def sleep(time):
-    #return 0
 import sys
 import argparse
 import webbrowser
 import shlex
 import shutil
+from openai import OpenAI
 
 from rich import print
 from rich.console import Console
@@ -32,16 +31,7 @@ def get_api_key():
         sys.exit(1)
     return key
 
-from openai import OpenAI
-
 client = OpenAI(api_key=get_api_key())
-
-# for billing endpoints
-from datetime import date
-try:
-    from openai.api_requestor import APIRequestor
-except ImportError:
-    APIRequestor = None
 
 # Try to import the OpenAIError exception; if that fails, fall back to Exception.
 try:
@@ -51,8 +41,8 @@ except (ImportError, ModuleNotFoundError):
         """Fallback if openai.error.OpenAIError isn't available."""
         pass
 
+# TODO: allow custom models (when these become depreciated)
 ALLOWED_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "o4-mini"]
-
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -69,24 +59,12 @@ def parse_args():
 def get_terminal_width():
     return shutil.get_terminal_size((80, 20)).columns  # default to 80 if undetectable
 
-def estimate_display_lines(text: str, width: int) -> int:
-    lines = text.split('\n')
-    total_lines = 0
-    for line in lines:
-        # Estimate wrapped lines
-        total_lines += (len(line) // width) + 1
-    return total_lines
-
 def setup_log_file(model):
-    # create logs dir if missing
     LOG_DIR = "logs"
     os.makedirs(LOG_DIR, exist_ok=True)
-    # name your log by timestamp
-    ts        = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_path  = os.path.join(LOG_DIR, f"chat_{ts}.txt")
-    # open handle in append mode
     log_file = open(log_path, "a", encoding="utf-8")
-    # write a header
     log_file.write(f"Chat session started {datetime.now().isoformat()}\n")
     log_file.write(f"Model: {model}\n\n")
     return log_file
