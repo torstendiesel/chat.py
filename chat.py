@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 import os
 from datetime import datetime
+#from time import sleep
+def sleep(time):
+    return 0
 import sys
 import argparse
 import webbrowser
 import shlex
+import shutil
 
 from rich import print
 from rich.console import Console
@@ -62,10 +66,22 @@ def parse_args():
     )
     return p.parse_args()
 
+def get_terminal_width():
+    return shutil.get_terminal_size((80, 20)).columns  # default to 80 if undetectable
+
+def estimate_display_lines(text: str, width: int) -> int:
+    lines = text.split('\n')
+    total_lines = 0
+    for line in lines:
+        # Estimate wrapped lines
+        total_lines += (len(line) // width) + 1
+    return total_lines
+
 def main():
     console = Console()
     args = parse_args()
     model = args.model
+    term_width = get_terminal_width() 
 
     # ─── SETUP LOG FILE ───────────────────────────
     # create logs dir if missing
@@ -179,15 +195,55 @@ o4-mini: Faster, more affordable reasoning model
         # Append the user's message
         messages.append({"role": "user", "content": user_input})
 
+        # Response 
         try:
-            with console.status(f"[bold yellow]{model} is thinking...[/bold yellow]", spinner="dots"):
-                resp = client.chat.completions.create(model=model,
-                messages=messages)
-            answer = resp.choices[0].message.content
+            console.print(f"\n[bold yellow]{model} is thinking...[/bold yellow]")
+            stream = client.responses.create(model=model, input=messages, stream=True)
+            output_length = 0
+            output_buffer = ""
+            for event in stream: 
+                #print(event.type)
+                if event.type == "response.output_text.delta":
+                    #print(event)
+                    output_length += len(event.delta)
+                    output_buffer += event.delta
+                    sys.stdout.write(event.delta)
+                    sys.stdout.flush()
+                    sleep(0.05)
+#                    if event.type == "response.output_text.done":
+#                        sys.stdout.write('\b' * len(live_buffer) + ' ' * len(live_buffer))
+#                        sys.stdout.flush()
+#                        #console.clear()
+#                        answer = event.text
+                #print(stream)
+                #answer = stream.output_item.done
+            #lines = output_buffer.count('\n') + 2
+            lines_to_clear = estimate_display_lines(output_buffer, term_width) + 1
+            for _ in range(lines_to_clear):
+                sys.stdout.write('\033[F')  # Move cursor up
+                #sys.stdout.write(' ' * 100)  # Clear the line
+                sys.stdout.write('\033[K')  # Clear the line
+                sys.stdout.flush()
+                sleep(0.5)
+            answer = output_buffer
+            # sys.stdout.write('\b' * output_length + ' ' * output_length)
+            # sys.stdout.flush()
             console.print(f"\n[bold yellow]{model}:[/bold yellow]")
             console.print(Markdown(answer))
             print("")
             messages.append({"role": "assistant", "content": answer})
+
+#def chatstream(list):
+#     strlen = 0
+#     output_buffer = ""
+#     for entry in list:
+#         strlen += len(entry)
+#         output_buffer += entry
+#         sys.stdout.write(entry)
+#         sys.stdout.flush()
+#         sleep(0.1)
+#     sys.stdout.write('\b' * strlen + output_buffer.upper() + '\n')
+#     sys.stdout.flush()
 
             # log AI response
             log_file.write(f"{model}: {answer}\n\n")
