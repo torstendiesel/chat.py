@@ -43,15 +43,16 @@ except (ImportError, ModuleNotFoundError):
 
 # TODO: allow custom models (when these become depreciated)
 ALLOWED_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "o4-mini"]
+DEFAULT_MODEL = "gpt-4.1-nano"
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="CLI chat with OpenAI models (default=gpt-4.1-nano)"
+        description=f"CLI chat with OpenAI models (default={DEFAULT_MODEL})"
     )
     p.add_argument(
         "-m", "--model",
         choices=ALLOWED_MODELS,
-        default="gpt-4.1-nano",
+        default=DEFAULT_MODEL,
         help="Which model to use"
     )
     return p.parse_args()
@@ -72,7 +73,7 @@ def setup_log_file(model):
 model_comparison = """Model comparison:
 gpt-4.1: Flagship GPT model for complex tasks. 
 gpt-4.1-mini: Balanced for intelligence, speed, and cost
-gpt-4.1-nano (default): Fastest, most cost-effective GPT-4.1 model
+gpt-4.1-nano: Fastest, most cost-effective GPT-4.1 model
 o4-mini: Faster, more affordable reasoning model
 
 | Model        | Intelligence    | Speed | Price (Input/Output per 1M tokens) |
@@ -84,7 +85,7 @@ o4-mini: Faster, more affordable reasoning model
 \n"""
 
 def thanks(model):
-    print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.")
+    print(f"\n[bold yellow]{model}:[/bold yellow] You're welcome! If you need me again, just type \"chat\" into your terminal.\n")
 
 def model_dialogue(cmd_parts, cmd, model):
     if len(cmd_parts) == 1:
@@ -101,6 +102,23 @@ def model_dialogue(cmd_parts, cmd, model):
         else:
             print(f"\n[bold red]Error:[/bold red] '{new_model}' is not a valid model.")
             print("\nChoose from:", ", ".join(ALLOWED_MODELS))
+            return 0
+
+def effort_dialogue(cmd_parts, cmd, model, effort):
+    if len(cmd_parts) == 1:
+        print(f"\nCurrent reasoning effort: [cyan]{effort}[/cyan]")
+        print("Available: low, medium, high")
+        print("Specify low, medium, or high for this parameter, where low favors speed and economical token usage, and high favors more complete reasoning.")
+        return 0
+    else:
+        new_effort = cmd_parts[1].strip()
+        if new_effort in ["low", "medium", "high"]:
+            effort = new_effort
+            print(f"\n[bold green]Switched effort to:[/bold green] {effort}")
+            return effort
+        else:
+            print(f"\n[bold red]Error:[/bold red] '{new_effort}' is not a valid effort.")
+            print("Available: low, medium, high")
             return 0
 
 def import_files_as_context(user_input, log_file, messages):
@@ -135,12 +153,24 @@ def import_files_as_context(user_input, log_file, messages):
 
 
 
-def response(messages, log_file, term_width, model, console):
+def response(messages, log_file, term_width, model, console, effort):
     # Most complex part of this program
     # Streams tokens as plaintext, then once we get the final response, clear all the lines of plaintext and replace them with markdown
     try:
         console.print(f"\n[bold green]{model} is thinking...[/bold green]")
-        stream = client.responses.create(model=model, input=messages, stream=True)
+        if model == "o4-mini":
+            stream = client.responses.create(
+                model=model, 
+                reasoning={"effort": effort},
+                input=messages, 
+                stream=True
+            )
+        else: 
+            stream = client.responses.create(
+                model=model, 
+                input=messages, 
+                stream=True
+            )
         length_of_current_line = 0
         number_of_lines_in_output_so_far = 0
         output = ""
@@ -179,7 +209,7 @@ def response(messages, log_file, term_width, model, console):
         log_file.write(f"[ERROR] Unexpected: {e}\n\n")
 
 
-def loop(model, console, term_width, log_file, messages):
+def loop(model, console, term_width, log_file, messages, effort):
 
     while True:
         try:
@@ -209,6 +239,13 @@ def loop(model, console, term_width, log_file, messages):
                 if model_selector: # returns 0 if no model chosen
                     model = model_selector
                 continue
+
+            if cmd == "effort":
+                effort_selector = effort_dialogue(cmd_parts, cmd, model, effort)
+                if effort_selector: # returns 0 if no model chosen
+                    effort = effort_selector
+                continue
+
             
             if cmd == "usage":
                 webbrowser.open("https://platform.openai.com/usage")
@@ -226,14 +263,15 @@ def loop(model, console, term_width, log_file, messages):
         messages.append({"role": "user", "content": user_input})
 
         # Response 
-        response(messages, log_file, term_width, model, console)
+        response(messages, log_file, term_width, model, console, effort)
 
 def main():
 
-    print("\n[grey50]/thanks to leave\n/model to switch models\n/import file1.txt (file2.txt)...\n/usage to view API usage[/grey50]\n")
+    print("\n/thanks to leave\n/model  to switch models\n/import file1.txt (file2.txt)...\n/usage  to view API usage\n/effort to switch reasoning effort [\"low\", \"medium\", \"high\"] (o4-mini only)\n")
 
     args = parse_args()
     model = args.model
+    effort = "low"
     print(f"[bold yellow]{model}[/bold yellow]: How can I help you today?\n")
 
     console = Console()
@@ -241,7 +279,7 @@ def main():
     log_file = setup_log_file(model);
     messages = [{"role": "system", "content": "You are a helpful assistant."}]
 
-    loop(model, console, term_width, log_file, messages)
+    loop(model, console, term_width, log_file, messages, effort)
 
     # Clean up
     log_file.write(f"\nChat session ended {datetime.now().isoformat()}\n")
